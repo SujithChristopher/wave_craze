@@ -1,22 +1,44 @@
-from wave_craze import sum_as_string
-
-from PyQt6.QtWidgets import QApplication, QWidget
-
-# Only needed for access to command line arguments
+import pyqtgraph as pg
+from PyQt6.QtWidgets import *
+from PyQt6 import QtWidgets
 import sys
+from gui.guidesign import Ui_MainWindow
+from time import sleep
 
-# You need one (and only one) QApplication instance per application.
-# Pass in sys.argv to allow command line arguments for your app.
-# If you know you won't use command line arguments QApplication([]) works too.
-app = QApplication(sys.argv)
+class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+    def __init__(self, *args, **kwargs):
+        super(MainWindow, self).__init__(*args, **kwargs)
+        self.setupUi(self)
+        self.vert_layout()
+        self.init_buttons()
+        self.spin_value = 0
+        
+    def init_buttons(self):
+        self.spinBox.valueChanged.connect(self.spin_value_cb)
+        
+        
+    def vert_layout(self):
 
-# Create a Qt widget, which will be our window.
-window = QWidget()
-window.show()  # IMPORTANT!!!!! Windows are hidden by default.
+        self.plot_widget = pg.PlotWidget()
+        
+        y = [5, 5, 7, 10, 3, 8, 9, 1, 6, 2]
+        x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+                
+        self.verticalLayout.addWidget(self.plot_widget)
+        self.plot_widget.plot(x, y, pen='r')
+        
+        self.combo_box = QtWidgets.QComboBox()
+        self.combo_box.setObjectName("combo_box")
+        self.verticalLayout.addWidget(self.combo_box)
 
-# Start the event loop.
-
+    def spin_value_cb(self):
+        self.spin_value = self.spinBox.value()
+        # self.verticalLayout.removeWidget(self.plot_widget)
+        # self.verticalLayout.deleteLater()
+        self.verticalLayout.takeAt(0)
 
 if __name__ == "__main__":
-    print(sum_as_string(1, 2))
-    app.exec()
+    app = QtWidgets.QApplication(sys.argv)
+    w = MainWindow()
+    w.show()
+    sys.exit(app.exec())
