@@ -73,3 +73,7 @@ docs/_build/
 build
 pyvenv
 main.spec
+main.build
+main.dist
+main.onefile-build
+main.exe
