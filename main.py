@@ -9,33 +9,63 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
         self.setupUi(self)
-        self.vert_layout()
-        self.init_buttons()
+
         self.spin_value = 0
+        self.spin_change = 0
+        
+        self.previous_spin = 1
+        self.current_spin = 1
+        
+        self.spinBox.setMinimum(1)
+    
+        self.spin_value_cb()
+        self.init_buttons()
         
     def init_buttons(self):
         self.spinBox.valueChanged.connect(self.spin_value_cb)
         
+    
+    def dynamic_widgets(self):
+        print('spin value',self.spin_value)
+        if self.spin_change == 1:
+            match self.spin_value:
+                case 2:
+                    self.combo_box_2 = QtWidgets.QComboBox()
+                    self.combo_box_2.setObjectName("combo_box_2")
+                    self.verticalLayout.addWidget(self.combo_box_2)
+                    self.plot_widget_2 = pg.PlotWidget()
+                    self.verticalLayout.addWidget(self.plot_widget_2)
+                case 3:
+                    self.combo_box_3 = QtWidgets.QComboBox()
+                    self.combo_box_3.setObjectName("combo_box_3")
+                    self.verticalLayout.addWidget(self.combo_box_3)
+                    self.plot_widget_3 = pg.PlotWidget()
+                    self.verticalLayout.addWidget(self.plot_widget_3)
+                case 4:
+                    self.combo_box_4 = QtWidgets.QComboBox()
+                    self.combo_box_4.setObjectName("combo_box_4")
+                    self.verticalLayout.addWidget(self.combo_box_4)
+                    self.plot_widget_4 = pg.PlotWidget()
+                    self.verticalLayout.addWidget(self.plot_widget_4)
+        if self.spin_change == -1:
+            self.verticalLayout.takeAt(0)
+            self.verticalLayout.takeAt(0)
         
-    def vert_layout(self):
-
-        self.plot_widget = pg.PlotWidget()
+        if self.spin_change == 0:
+            self.combo_box = QtWidgets.QComboBox()
+            self.combo_box.setObjectName("combo_box")
+            self.verticalLayout.addWidget(self.combo_box)
+            self.plot_widget = pg.PlotWidget()
+            self.verticalLayout.addWidget(self.plot_widget)
         
-        y = [5, 5, 7, 10, 3, 8, 9, 1, 6, 2]
-        x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-                
-        self.verticalLayout.addWidget(self.plot_widget)
-        self.plot_widget.plot(x, y, pen='r')
-        
-        self.combo_box = QtWidgets.QComboBox()
-        self.combo_box.setObjectName("combo_box")
-        self.verticalLayout.addWidget(self.combo_box)
 
     def spin_value_cb(self):
         self.spin_value = self.spinBox.value()
-        # self.verticalLayout.removeWidget(self.plot_widget)
-        # self.verticalLayout.deleteLater()
-        self.verticalLayout.takeAt(0)
+        self.current_spin = self.spin_value
+        self.spin_change = self.current_spin - self.previous_spin
+        print(self.spin_change)
+        self.previous_spin = self.current_spin
+        self.dynamic_widgets()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
