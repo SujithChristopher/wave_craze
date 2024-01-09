@@ -47,6 +47,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                     self.verticalLayout.addWidget(self.combo_box_4)
                     self.plot_widget_4 = pg.PlotWidget()
                     self.verticalLayout.addWidget(self.plot_widget_4)
+                    
         if self.spin_change == -1:
             self.verticalLayout.takeAt(0)
             self.verticalLayout.takeAt(0)
