@@ -53,7 +53,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         
         if self.spin_change == 0:
             self.combo_box = QtWidgets.QComboBox()
-            self.combo_box.setObjectName("combo_box")
+            self.combo_box.setObjectName("combo_box_1")
             self.verticalLayout.addWidget(self.combo_box)
             self.plot_widget = pg.PlotWidget()
             self.verticalLayout.addWidget(self.plot_widget)
