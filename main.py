@@ -9,7 +9,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
         self.setupUi(self)
-
         self.spin_value = 0
         self.spin_change = 0
         
@@ -53,9 +52,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.verticalLayout.takeAt(0)
         
         if self.spin_change == 0:
-            self.combo_box = QtWidgets.QComboBox()
-            self.combo_box.setObjectName("combo_box_1")
-            self.verticalLayout.addWidget(self.combo_box)
+            self.combo_box_1 = QtWidgets.QComboBox()
+            self.combo_box_1.setObjectName("combo_box_1")
+            self.verticalLayout.addWidget(self.combo_box_1)
             self.plot_widget = pg.PlotWidget()
             self.verticalLayout.addWidget(self.plot_widget)
         
