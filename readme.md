@@ -1,1 +1,0 @@
-This is a project for reading sensor values from micro-controller.
