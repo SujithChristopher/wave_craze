@@ -1,4 +1,5 @@
 import time
+import os
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot, QThreadPool
 from PyQt6.QtWidgets import QMainWindow, QTabWidget
 import pyqtgraph as pg
@@ -13,6 +14,7 @@ from main_gui import *
 import serial.tools.list_ports
 from PyQt6.QtWidgets import QTableWidgetItem
 from PyQt6 import QtWidgets
+from PyQt6.QtWidgets import QMessageBox
 
 def roll(array):
     return np.roll(array, -1)
@@ -77,12 +79,6 @@ class MainWindow(QMainWindow):
         self.f_data = [np.zeros(100) for _ in range(4)]
         self.curve_dict = {}
 
-        self.csv_filename = 'sensor_data.csv'
-        self.csv_file = open(self.csv_filename, mode='w', newline='')
-        self.csv_writer = csv.writer(self.csv_file)
-
-        self.select_port()
-        
         self.trigger = 0
         self.worker_thread = None
         self.stop_thread = False
@@ -109,7 +105,7 @@ class MainWindow(QMainWindow):
         self.plot_widgets[2].setVisible(False)
         self.plot_widgets[3].setVisible(False)
 
-        self.update_serial_port()
+        self.select_port()
         self.update_time()
         self.load_data()
         self.is_running = False  
@@ -127,16 +123,58 @@ class MainWindow(QMainWindow):
             self.is_running = False
 
     def read_config(self):
-        config = toml.load('config.toml')
+        config_dir = 'C:/wave_craze'
+        os.makedirs(config_dir, exist_ok=True)  # Create 'wave_craze' folder if it doesn't exist
+        config_path = os.path.join(config_dir, 'config.toml')
+
+        if not os.path.exists(config_path):
+            # Create a default config file if it doesn't exist
+            default_config = {
+                'parameters': {
+                    'parameter1': 'float',
+                    'parameter2': 'int',
+                },
+                'sampling_frequency': 1,
+                'y_limit': {
+                    'y1': [0, 10],
+                    'y2': [0, 10],
+                    'y3': [0, 10],
+                    'y4': [0, 10]
+                }
+            }
+            with open(config_path, 'w') as f:
+                toml.dump(default_config, f)
+
+        config = toml.load(config_path)
         return config
-    
+
+
     def read_sf(self):
         config = toml.load('config.toml')
         return config.get('sampling_frequency'[0], {})
 
     def read_y_limits(self):
-        config = toml.load('config.toml')
+        # Get the directory of the executable
+        exe_dir = os.path.dirname(sys.executable)
+        # Construct the full path to the 'config.toml' file
+        config_path = os.path.join(exe_dir, 'config.toml')
+
+        try:
+            config = toml.load(config_path)
+        except FileNotFoundError:
+            # If the 'config.toml' file is not found, create a default config
+            config = {
+                'y_limit': {
+                    'y1': [0, 10],
+                    'y2': [0, 10],
+                    'y3': [0, 10],
+                    'y4': [0, 10]
+                }
+            }
+            # Optionally, you can write the default config to the 'config.toml' file here
+
         return config.get('y_limit', {})
+
     
     # Logic for the com port selection
     def select_port(self):
@@ -146,28 +184,37 @@ class MainWindow(QMainWindow):
 
     # logic for the data in seconds 
     def select_time(self):
-        self.sampling_rate = self.read_sf().get('value', 1) 
-        
         selected_time = int(self.viewTab.seconds_combo.currentText())
-        num_data_points = int(selected_time * 200)  
-        self.x_range = self.sampling_rate * selected_time
+        num_data_points = int(selected_time * self.sampling_frequency)  # Calculate the number of data points based on sampling frequency
+        self.x_data = np.linspace(0, selected_time, num_data_points)  # Update the X array based on selected time and sampling frequency
 
+        # Update the f_data arrays for each sensor to match the new length
         for i, combo_box in enumerate(self.combo_boxes):
             if combo_box.isVisible():
                 index = combo_box.currentIndex()
-                self.f_data[index] = np.roll(self.f_data[index], -num_data_points)
-                self.f_data[index][:num_data_points] = 0  # Reset old data
-                plot_widget = self.plot_widgets[i]
-                plot_widget.setXRange(0, self.x_range)
+                if index < len(self.parameters):
+                    self.f_data[index] = np.roll(self.f_data[index], -num_data_points)
+                    self.f_data[index][:num_data_points] = 0  # Reset old data
 
-        self.x_data = np.linspace(0, self.x_range, num_data_points)
+        self.x_range = selected_time
+
+
 
     def update_time(self):
         self.time = [1, 5, 10]
         self.viewTab.seconds_combo.addItems([str(t) for t in self.time])
 
-    def update_serial_port(self):
-        self.serial_port = serial.Serial(self.viewTab.com_port_combo.currentText(), 115200)
+
+    def update_serial_port(self, index):
+        selected_port = self.viewTab.com_port_combo.itemText(index)
+        if selected_port:
+            try:
+                self.serial_port = serial.Serial(selected_port, 115200)
+            except Exception as e:
+                print("Error opening serial port:", e)
+        else:
+            print("No port selected")
+
 
     def toggle_record(self):
         if not self.recording:
@@ -178,6 +225,11 @@ class MainWindow(QMainWindow):
     def start_record(self):
         self.recording = True
         self.viewTab.record_button.setStyleSheet("background-color: red")
+        folder_path = "C:/wave_craze"
+        os.makedirs(folder_path, exist_ok=True)  # Create the folder if it doesn't exist
+        file_path = os.path.join(folder_path, 'sensor_data.csv')
+        self.csv_file = open(file_path, mode='w', newline='')
+        self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(["Time"] + list(self.parameters.keys()))
 
     def stop_record(self):
@@ -202,6 +254,9 @@ class MainWindow(QMainWindow):
             combo_box.addItems(self.parameters.keys())
             self.viewTab.verticalLayout.addWidget(combo_box)
             self.combo_boxes.append(combo_box)
+            # Change this line in the dynamic_widgets method
+            combo_box.setCurrentIndex(-1)  # Set no current index
+
 
             plot_widget = pg.PlotWidget()
             self.viewTab.verticalLayout.addWidget(plot_widget, stretch=1)
@@ -224,7 +279,14 @@ class MainWindow(QMainWindow):
     def create_curve(self, plot_widget, index):
         plot_widget.clear()
         colors = ['r', 'g', 'b', 'y']
-        curve = plot_widget.plot(pen=pg.mkPen(color=colors[index], width=2.5), name=f"Parameter {index+1}")
+        color = colors[index % len(colors)]  # Wrap around the index if it exceeds the length of colors
+        curve = plot_widget.plot(pen=pg.mkPen(color=color, width=2.5), name=f"Parameter {index+1}")
+
+        # Update f_data for the selected sensor
+        if index < len(self.parameters):
+            num_data_points = len(self.x_data)
+            self.f_data[index] = np.zeros(num_data_points)
+
         curve.setData(self.x_data, self.f_data[index], autoDownsample=True)
 
         plot_widget.setXRange(self.x_data[0], self.x_data[-1])
@@ -255,21 +317,20 @@ class MainWindow(QMainWindow):
         return False
 
     def return_str(self):
-        self.total_float = 0
-        self.total_int = 0
-
+        format_str = ""
         for key in self.parameters.keys():
             if self.parameters[key] == 'float':
-                self.total_float += 1
+                format_str += 'f'
             elif self.parameters[key] == 'int':
-                self.total_int += 1
+                format_str += 'i'
+            elif self.parameters[key] == 'long':
+                format_str += 'l'
+            elif self.parameters[key] == 'char':
+                format_str += 'c'
+            elif self.parameters[key] == 'bool':
+                format_str += '?'
 
-        self.val = ""
-
-        if self.total_float:
-            self.val = str(self.total_float)+'f'
-        if self.total_int:
-            self.val = str(self.total_int)+'i'
+        self.val = format_str
 
     def unpack_values(self, progress_callback):
         while self.serial_port.is_open:
@@ -278,42 +339,44 @@ class MainWindow(QMainWindow):
                     self.return_str()
                     payload_format = self.val
                     payload_size = struct.calcsize(payload_format)
-                    
                     unpacked_data = struct.unpack(payload_format, self.payload[:payload_size])
                     progress_callback.emit(unpacked_data)
-                    # print(unpacked_data)
                 except struct.error as e:
                     print("Error unpacking data:", e)
             if self.trigger == 1:
                 self.trigger = 2
                 break
     
-    # Logic for the data plotting                 
     @pyqtSlot(list)
     def update_plot(self, data):
         if self.recording:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            record_data = [timestamp] + list(data)
-            self.csv_writer.writerow(record_data)
+            # Write data to CSV file
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.csv_writer.writerow([current_time] + data)
 
-        for i in range(self.spin_value):
-            if self.combo_boxes[i].isVisible():
-                selected_index = self.combo_boxes[i].currentIndex()
-                parameter_name = self.combo_boxes[i].currentText()
-                if parameter_name in self.parameters:
-                    index = list(self.parameters.keys()).index(parameter_name)
-                    if index < len(self.f_data):
-                        if len(self.f_data[index]) != len(self.x_data):
-                            self.f_data[index] = np.zeros_like(self.x_data)
-                        else:
-                            self.f_data[index] = roll(self.f_data[index])
-                        self.f_data[index][-1] = data[selected_index]
+        for i, value in enumerate(data):
+            for j, combo_box in enumerate(self.combo_boxes):
+                if combo_box.isVisible() and combo_box.currentIndex() == i:
+                    parameter_name = combo_box.currentText()
+                    if parameter_name in self.parameters:
+                        index = list(self.parameters.keys()).index(parameter_name)
+                        if index < len(self.f_data):
+                            if len(self.f_data[index]) != len(self.x_data):
+                                self.f_data[index] = np.zeros_like(self.x_data)
+                            else:
+                                self.f_data[index] = roll(self.f_data[index])
+                            
+                            # Convert boolean value to integer before updating the plot
+                            if isinstance(value, bool):
+                                value = int(value)
 
-                        # Update the plot every 10 data points
-                        if len(self.f_data[index]) % 10 == 0:
-                            for curve in self.curve_dict.get(index, []):
-                                curve.setData(self.x_data, self.f_data[index])
-                                
+                            self.f_data[index][-1] = value
+
+                            # Update the plot every 10 data points
+                            if len(self.f_data[index]) % 10 == 0:
+                                for curve in self.curve_dict.get(index, []):
+                                    curve.setData(self.x_data[:len(self.f_data[index])], self.f_data[index])
+
     # Stop the program 
     def stop_program(self):
         self.recording = False
@@ -332,20 +395,36 @@ class MainWindow(QMainWindow):
         self.viewTab.stop_button.setEnabled(True)
 
     def add_rows(self):
-        self.settingsTab.tableWidget.insertRow(self.settingsTab.tableWidget.rowCount()-1)
-        self.settingsTab.tableWidget.insertColumn(self.settingsTab.tableWidget.rowCount()-1)
+       
+        self.settingsTab.tableWidget.insertRow(self.settingsTab.tableWidget.rowCount())
+
     
     # displays the saved data in the settings tab
     def load_data(self):
-        config = toml.load('config.toml')
-        parameters = config.get('parameters', {})
+        config_dir = 'C:/wave_craze'
+        config_path = os.path.join(config_dir, 'config.toml')
 
-        self.settingsTab.tableWidget.setRowCount(len(parameters))
+        try:
+            config = toml.load(config_path)
+        except FileNotFoundError:
+            config = {
+                'parameters': {},
+                'y_limit': {
+                    'y1': [0, 10],
+                    'y2': [0, 10],
+                    'y3': [0, 10],
+                    'y4': [0, 10]
+                },
+                'sampling_frequency': 1
+            }
+
+
+        self.settingsTab.tableWidget.setRowCount(len(config.get('parameters', {})))
         self.settingsTab.tableWidget.setColumnCount(2)
         self.settingsTab.tableWidget.setHorizontalHeaderLabels(["Sensor ", "Data Type"])
 
         # Load sensor parameters
-        for i, (sensor, datatype) in enumerate(parameters.items()):
+        for i, (sensor, datatype) in enumerate(config.get('parameters', {}).items()):
             sensor_item = QTableWidgetItem(sensor)
             datatype_item = QTableWidgetItem(datatype)
             self.settingsTab.tableWidget.setItem(i, 0, sensor_item)
@@ -364,11 +443,37 @@ class MainWindow(QMainWindow):
 
         self.settingsTab.com_sf.setText(str(config.get('sampling_frequency', 1)))
 
+
     #save the data form the settings tab
     def save_data(self):
-        config = toml.load('config.toml')
+        if self.settingsTab.tableWidget.rowCount() == 0 or self.settingsTab.tableWidget.columnCount() == 0:
+            QMessageBox.warning(self, "Warning", "No data to save. Please add sensor parameters.")
+            return
+
+        # Create 'C:/wave_craze' directory if it doesn't exist
+        config_dir = 'C:/wave_craze'
+        os.makedirs(config_dir, exist_ok=True)
+
+        config_path = os.path.join(config_dir, 'config.toml')
+
+        # Load the existing config if it exists, otherwise create a default config
+        try:
+            config = toml.load(config_path)
+        except FileNotFoundError:
+            config = {
+                'parameters': {},
+                'y_limit': {
+                    'y1': [0, 10],
+                    'y2': [0, 10],
+                    'y3': [0, 10],
+                    'y4': [0, 10]
+                },
+                'sampling_frequency': 1
+            }
+
         parameters = {}
 
+        # Collect sensor parameters from the table
         for row in range(self.settingsTab.tableWidget.rowCount()):
             sensor_item = self.settingsTab.tableWidget.item(row, 0)
             datatype_item = self.settingsTab.tableWidget.item(row, 1)
@@ -377,6 +482,13 @@ class MainWindow(QMainWindow):
                 datatype = datatype_item.text().lower()
                 parameters[sensor] = datatype
 
+        # Check for unwanted values (datatypes)
+        for sensor, datatype in parameters.items():
+            if datatype not in ['float', 'int', 'long', 'bool', 'char']:
+                QMessageBox.warning(self, "Warning", f"Unwanted datatype '{datatype}' found for sensor '{sensor}'")
+                return
+
+        # Proceed with saving data if everything is okay
         config['parameters'] = parameters
 
         y_limits = {
@@ -389,16 +501,21 @@ class MainWindow(QMainWindow):
 
         config['sampling_frequency'] = int(self.settingsTab.com_sf.text())
 
-        with open('config.toml', 'w') as f:
+        # Save the updated config to the 'config.toml' file
+        with open(config_path, 'w') as f:
             toml.dump(config, f)
 
         print("Data saved successfully!")
         print("Updated parameters:", parameters)
 
+        # Update the main tab with the new settings
+        self.update_main_tab()
         self.update_plot_from_settings()
 
-        self.update_main_tab()
-        
+        # Update the settings tab with the new values
+        self.load_data()
+
+
     #update the saved data to the widgets
     def update_main_tab(self):
         config = self.read_config()
