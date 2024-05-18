@@ -15,6 +15,8 @@ import serial.tools.list_ports
 from PyQt6.QtWidgets import QTableWidgetItem
 from PyQt6 import QtWidgets
 from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QFileDialog
 
 def roll(array):
     return np.roll(array, -1)
@@ -26,7 +28,6 @@ class WorkerSignals(QObject):
     progress = pyqtSignal(list)
 
 class Worker(QRunnable):
-
     def __init__(self, fn, *args, **kwargs):
         super(Worker, self).__init__()
 
@@ -54,7 +55,6 @@ class Worker(QRunnable):
         finally:
             self.signals.finished.emit()
 
-
 class MainWindow(QMainWindow):
     data_saved = pyqtSignal()
     def __init__(self):
@@ -62,9 +62,12 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.viewTab = MainTab()
+        self.mathTab = functionTab()
         self.settingsTab = SettingTab()
+        
 
         self.tabs.addTab(self.viewTab, "Realtime View")
+        self.tabs.addTab(self.mathTab, "MATH")
         self.tabs.addTab(self.settingsTab, "Settings")
 
         self.threadpool = QThreadPool()
@@ -72,6 +75,8 @@ class MainWindow(QMainWindow):
         
         self.viewTab.spinBox.setMinimum(1)
         self.spin_value = 1
+        self.recording_counter = 1
+
         self.parameters = self.read_config()['parameters']
         self.sampling_frequency = self.read_config()['sampling_frequency']
         self.dynamic_widgets()
@@ -82,6 +87,8 @@ class MainWindow(QMainWindow):
         self.trigger = 0
         self.worker_thread = None
         self.stop_thread = False
+        
+        self.trig = False
         
         self.recording = False 
         self.viewTab.record_button.clicked.connect(self.toggle_record)
@@ -94,6 +101,7 @@ class MainWindow(QMainWindow):
         self.settingsTab.save_button.clicked.connect(self.save_data)
         self.settingsTab.tableWidget.setHorizontalHeaderLabels(["Sensor ", "Data Type"])
         self.data_saved.connect(self.update_main_tab)
+        
 
         for i, combo_box in enumerate(self.combo_boxes):
             combo_box.activated.connect(self.crv_set)
@@ -111,6 +119,76 @@ class MainWindow(QMainWindow):
         self.is_running = False  
         self.viewTab.start_button.clicked.connect(self.handle_start)
         self.viewTab.stop_button.clicked.connect(self.handle_stop)
+        self.mathTab.dropdown1.addItems(self.parameters.keys())
+        self.mathTab.dropdown2.addItems(self.parameters.keys())
+        self.mathTab.add_button.clicked.connect(self.add_selected_sensor_values)
+
+        self.browse_button = QtWidgets.QPushButton(self.settingsTab.verticalLayoutWidget)
+        self.browse_button.setFixedHeight(30)
+        self.browse_button.setFixedWidth(100)
+        self.browse_button.setGeometry(QRect(465, 520, 93, 28))
+        self.browse_button.setStyleSheet("background-color: rgb(7, 117, 127);")
+        self.browse_button.setText("Browse")
+        self.browse_button.clicked.connect(self.open_file_dialog)
+        
+        self.settingsTab.tableWidget.keyPressEvent = self.handle_key_press_event
+
+    def open_file_dialog(self):
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "", "TOML Files (*.toml)")
+
+        if file_name:
+            print(file_name)
+            try:
+                with open(file_name, 'r') as file:
+                    content = file.read()
+                    # Parse the TOML content into a dictionary
+                    config = toml.loads(content)
+
+                    # Update the settings tab's widgets with the loaded data
+                    for sensor, datatype in config.get('parameters', {}).items():
+                        row_position = self.settingsTab.tableWidget.rowCount()
+                        self.settingsTab.tableWidget.insertRow(row_position)
+                        self.settingsTab.tableWidget.setItem(row_position, 0, QTableWidgetItem(sensor))
+                        self.settingsTab.tableWidget.setItem(row_position, 1, QTableWidgetItem(datatype))
+
+                    self.settingsTab.lineEdit.setText(str(config.get('y_limit', {}).get('y1', [])[0]))
+                    self.settingsTab.lineEdit_2.setText(str(config.get('y_limit', {}).get('y2', [])[0]))
+                    self.settingsTab.lineEdit_3.setText(str(config.get('y_limit', {}).get('y3', [])[0]))
+                    self.settingsTab.lineEdit_4.setText(str(config.get('y_limit', {}).get('y4', [])[0]))
+                    self.settingsTab.lineEdit_5.setText(str(config.get('y_limit', {}).get('y1', [])[1]))
+                    self.settingsTab.lineEdit_6.setText(str(config.get('y_limit', {}).get('y2', [])[1]))
+                    self.settingsTab.lineEdit_7.setText(str(config.get('y_limit', {}).get('y3', [])[1]))
+                    self.settingsTab.lineEdit_8.setText(str(config.get('y_limit', {}).get('y4', [])[1]))
+                    self.settingsTab.com_sf.setText(str(config.get('sampling_frequency', 1)))
+
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Error loading TOML file: {e}")
+
+
+    def handle_key_press_event(self, event):
+        if event.key() == Qt.Key.Key_Delete:
+            # Delete the selected rows
+            for item in self.settingsTab.tableWidget.selectedItems():
+                self.settingsTab.tableWidget.removeRow(item.row())
+
+            # Delete the selected columns
+            for item in self.settingsTab.tableWidget.selectedItems():
+                self.settingsTab.tableWidget.removeColumn(item.column())
+
+    def handle_mouse_click(self, plot_widget, event):
+        if event.button() == Qt.MouseButton.LeftButton and event.double():
+            state = plot_widget.getViewBox().getState()
+            auto_range = state['autoRange'][1]
+            plot_widget.enableAutoRange(axis='y', enable=not auto_range)
+            if not auto_range:
+                self.trig = True
+        elif event.button() == Qt.MouseButton.LeftButton and not event.double() and self.trig:
+            y_limits = self.read_y_limits()  # Assuming this method reads the y-axis limits from your settings
+            y_key = f'y{self.plot_widgets.index(plot_widget) + 1}'
+            if y_key in y_limits:
+                min_value, max_value = y_limits[y_key]
+                plot_widget.setYRange(min_value, max_value)  # Set the y-axis range based on the y_limits
+                self.trig = False
 
     def handle_start(self):
         if not self.is_running:
@@ -121,6 +199,8 @@ class MainWindow(QMainWindow):
         if self.is_running:
             self.stop_program()
             self.is_running = False
+
+        
 
     def read_config(self):
         config_dir = 'C:/wave_craze'
@@ -148,7 +228,6 @@ class MainWindow(QMainWindow):
         config = toml.load(config_path)
         return config
 
-
     def read_sf(self):
         config = toml.load('config.toml')
         return config.get('sampling_frequency'[0], {})
@@ -172,10 +251,8 @@ class MainWindow(QMainWindow):
                 }
             }
             # Optionally, you can write the default config to the 'config.toml' file here
-
         return config.get('y_limit', {})
 
-    
     # Logic for the com port selection
     def select_port(self):
         ports = serial.tools.list_ports.comports()
@@ -198,12 +275,9 @@ class MainWindow(QMainWindow):
 
         self.x_range = selected_time
 
-
-
     def update_time(self):
         self.time = [1, 5, 10]
         self.viewTab.seconds_combo.addItems([str(t) for t in self.time])
-
 
     def update_serial_port(self, index):
         selected_port = self.viewTab.com_port_combo.itemText(index)
@@ -211,10 +285,11 @@ class MainWindow(QMainWindow):
             try:
                 self.serial_port = serial.Serial(selected_port, 115200)
             except Exception as e:
-                print("Error opening serial port:", e)
+                QMessageBox.warning(self, "Error", f"Error opening serial port: {e}")
+                QtWidgets.QApplication.processEvents()  # Force processing of events to show the message box
         else:
-            print("No port selected")
-
+            QMessageBox.warning(self, "Warning", "No COM port selected")        
+            QtWidgets.QApplication.processEvents()  # Force processing of events to show the message box
 
     def toggle_record(self):
         if not self.recording:
@@ -227,7 +302,8 @@ class MainWindow(QMainWindow):
         self.viewTab.record_button.setStyleSheet("background-color: red")
         folder_path = "C:/wave_craze"
         os.makedirs(folder_path, exist_ok=True)  # Create the folder if it doesn't exist
-        file_path = os.path.join(folder_path, 'sensor_data.csv')
+        self.recording_counter += 1  # Increment the recording counter
+        file_path = os.path.join(folder_path, f'sensor_data{self.recording_counter}.csv')
         self.csv_file = open(file_path, mode='w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(["Time"] + list(self.parameters.keys()))
@@ -235,7 +311,9 @@ class MainWindow(QMainWindow):
     def stop_record(self):
         self.recording = False
         self.viewTab.record_button.setStyleSheet("background-color: green")
-        self.csv_file.close()  # Close the CSV file
+        if hasattr(self, 'csv_file') and self.csv_file:
+            self.csv_file.close()  # Close the CSV file
+
 
     def change_color(self):
         self.toggle_record()
@@ -246,7 +324,7 @@ class MainWindow(QMainWindow):
         self.plot_widgets = []
 
         y_limits = self.read_y_limits()
-        print(y_limits) 
+        # print(y_limits) 
 
         for i in range(4):
             combo_box = QtWidgets.QComboBox()
@@ -257,7 +335,6 @@ class MainWindow(QMainWindow):
             # Change this line in the dynamic_widgets method
             combo_box.setCurrentIndex(-1)  # Set no current index
 
-
             plot_widget = pg.PlotWidget()
             self.viewTab.verticalLayout.addWidget(plot_widget, stretch=1)
             plot_widget.setBackground('w')
@@ -267,8 +344,10 @@ class MainWindow(QMainWindow):
                 plot_widget.setYRange(y_limits[f'y{i+1}'][0], y_limits[f'y{i+1}'][1])
             else:
                 print(f"Y limits not found for index {i}")
-
-        print("Dynamic widgets created successfully")  
+        # print("Dynamic widgets created successfully")  
+        
+        for plot_widget in self.plot_widgets:
+            plot_widget.scene().sigMouseClicked.connect(lambda event, plot_widget=plot_widget: self.handle_mouse_click(plot_widget, event))
 
     def manage_widgets(self):
         self.spin_value = self.viewTab.spinBox.value()
@@ -288,6 +367,7 @@ class MainWindow(QMainWindow):
             self.f_data[index] = np.zeros(num_data_points)
 
         curve.setData(self.x_data, self.f_data[index], autoDownsample=True)
+        # plot_widget.scene().sigMouseClicked.connect(lambda event: self.handle_mouse_click(plot_widget, event))
 
         plot_widget.setXRange(self.x_data[0], self.x_data[-1])
         if index in self.curve_dict:
@@ -301,7 +381,6 @@ class MainWindow(QMainWindow):
                 selected_index = self.combo_boxes[i].currentIndex()
                 if selected_index < len(self.parameters):
                     self.create_curve(self.plot_widgets[i], selected_index)
-
 
     def serial_read(self):
         if (self.serial_port.read() == b'\xff') and (self.serial_port.read() == b'\xff'):
@@ -351,7 +430,7 @@ class MainWindow(QMainWindow):
     def update_plot(self, data):
         if self.recording:
             # Write data to CSV file
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S:%MS")
             self.csv_writer.writerow([current_time] + data)
 
         for i, value in enumerate(data):
@@ -365,13 +444,11 @@ class MainWindow(QMainWindow):
                                 self.f_data[index] = np.zeros_like(self.x_data)
                             else:
                                 self.f_data[index] = roll(self.f_data[index])
-                            
                             # Convert boolean value to integer before updating the plot
                             if isinstance(value, bool):
                                 value = int(value)
 
                             self.f_data[index][-1] = value
-
                             # Update the plot every 10 data points
                             if len(self.f_data[index]) % 10 == 0:
                                 for curve in self.curve_dict.get(index, []):
@@ -395,9 +472,7 @@ class MainWindow(QMainWindow):
         self.viewTab.stop_button.setEnabled(True)
 
     def add_rows(self):
-       
         self.settingsTab.tableWidget.insertRow(self.settingsTab.tableWidget.rowCount())
-
     
     # displays the saved data in the settings tab
     def load_data(self):
@@ -417,7 +492,6 @@ class MainWindow(QMainWindow):
                 },
                 'sampling_frequency': 1
             }
-
 
         self.settingsTab.tableWidget.setRowCount(len(config.get('parameters', {})))
         self.settingsTab.tableWidget.setColumnCount(2)
@@ -440,9 +514,7 @@ class MainWindow(QMainWindow):
         self.settingsTab.lineEdit_6.setText(str(y_limits.get('y2', [])[1]))
         self.settingsTab.lineEdit_7.setText(str(y_limits.get('y3', [])[1]))
         self.settingsTab.lineEdit_8.setText(str(y_limits.get('y4', [])[1]))
-
         self.settingsTab.com_sf.setText(str(config.get('sampling_frequency', 1)))
-
 
     #save the data form the settings tab
     def save_data(self):
@@ -504,6 +576,18 @@ class MainWindow(QMainWindow):
         # Save the updated config to the 'config.toml' file
         with open(config_path, 'w') as f:
             toml.dump(config, f)
+        
+        with open('config.toml', 'r') as f:
+            config = toml.load(f)
+        
+        # Add the new sensor to the existing TOML file
+        added_sensor_name = 'added'
+        added_sensor_type = 'float'  # Assuming the result is always a float
+        config[added_sensor_name] = added_sensor_type
+
+        # Write the updated config back to the TOML file
+        with open('config.toml', 'w') as f:
+            toml.dump(config, f)
 
         print("Data saved successfully!")
         print("Updated parameters:", parameters)
@@ -514,7 +598,6 @@ class MainWindow(QMainWindow):
 
         # Update the settings tab with the new values
         self.load_data()
-
 
     #update the saved data to the widgets
     def update_main_tab(self):
@@ -558,6 +641,7 @@ class MainWindow(QMainWindow):
         if new_sf != self.sampling_frequency:
             self.sampling_frequency = new_sf
             self.select_time()
+            
 
         # Read the new sensor parameters from the settings
         parameters = {}
@@ -579,6 +663,45 @@ class MainWindow(QMainWindow):
 
     def handle_error(self, error_tuple):
         print("ERROR:", error_tuple[0])
+        
+    def add_selected_sensor_values(self):
+        
+        sensor_name1 = self.mathTab.dropdown1.currentText()
+        sensor_name2 = self.mathTab.dropdown2.currentText()
+        sensor_type1 = self.parameters.get(sensor_name1)
+        sensor_type2 = self.parameters.get(sensor_name2)
+
+        if sensor_name1 and sensor_name2 and sensor_type1 and sensor_type2:
+            index1 = list(self.parameters.keys()).index(sensor_name1)
+            index2 = list(self.parameters.keys()).index(sensor_name2)
+
+            values1 = self.f_data[index1]
+            values2 = self.f_data[index2]
+
+            added_values = [v1 + v2 for v1, v2 in zip(values1, values2)]
+
+            added_sensor_name = 'added'
+            added_sensor_type = 'float' 
+            self.parameters[added_sensor_name] = added_sensor_type
+
+            self.update_main_tab()
+
+            self.update_settings_tab(added_sensor_name, added_sensor_type)
+
+            QMessageBox.information(self, "Success", "Sensor values added and saved successfully!")
+        else:
+            QMessageBox.warning(self, "Warning", "Please select two valid sensors for addition!")
+
+    def update_settings_tab(self, sensor_name, added_sensor_type):
+        for row in range(self.settingsTab.tableWidget.rowCount()):
+            if self.settingsTab.tableWidget.item(row, 0).text() == sensor_name:
+                self.settingsTab.tableWidget.setItem(row, 1, QTableWidgetItem(added_sensor_type))
+                return
+        row_position = self.settingsTab.tableWidget.rowCount()
+        self.settingsTab.tableWidget.insertRow(row_position)
+        self.settingsTab.tableWidget.setItem(row_position, 0, QTableWidgetItem(sensor_name))
+        self.settingsTab.tableWidget.setItem(row_position, 1, QTableWidgetItem(added_sensor_type))
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

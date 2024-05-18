@@ -126,9 +126,10 @@ class SettingTab(QWidget):
     def retranslateUi(self):
         _translate = QtCore.QCoreApplication.translate
         self.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.label.setText(_translate("MainWindow", "y_limits"))
+        self.label.setText(_translate("MainWindow", "Y- AXIS LIMITS"))
         self.add_button.setText(_translate("MainWindow", "Add "))
         self.label_2.setText(_translate("MainWindow", "Y1        :"))
+        # self.label_2.font.setBold(True)
         self.label_3.setText(_translate("MainWindow", "Y2       :"))
         self.label_4.setText(_translate("MainWindow", "Y3        :"))
         self.label_5.setText(_translate("MainWindow", "Y4        :"))
@@ -136,7 +137,7 @@ class SettingTab(QWidget):
         item.setText(_translate("MainWindow", "List of Sensors"))
         item = self.tableWidget.horizontalHeaderItem(1)
         item.setText(_translate("MainWindow", "Data Types"))
-        self.save_button.setText(_translate("MainWindow", "SAVE"))
+        self.save_button.setText(_translate("MainWindow", "Save"))
 
 class MainTab(QWidget):
     def __init__(self):
@@ -222,6 +223,57 @@ class MainTab(QWidget):
 
         # Set the layout for the MainTab
         self.setLayout(self.verticalLayout)
+        
+class functionTab(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setupUi()
+
+    def setupUi(self):
+        self.setObjectName("functionTab")
+        self.resize(1096, 850)
+
+        self.verticalLayout = QtWidgets.QVBoxLayout(self)
+        self.verticalLayout.setObjectName("verticalLayout")
+
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.verticalLayout.addLayout(self.horizontalLayout)
+
+        self.dropdown1 = QtWidgets.QComboBox(self)
+        self.dropdown1.setObjectName("dropdown1")
+        self.dropdown1.setFixedHeight(30)
+        self.dropdown1.setFixedWidth(100)
+        self.horizontalLayout.addWidget(self.dropdown1)
+
+        # Add a QLabel with + symbol
+        plus_label = QtWidgets.QLabel("+")
+        plus_label.setObjectName("plus_label")
+        self.horizontalLayout.addWidget(plus_label)
+
+        self.dropdown2 = QtWidgets.QComboBox(self)
+        self.dropdown2.setObjectName("dropdown2")
+        self.dropdown2.setFixedHeight(30)
+        self.dropdown2.setFixedWidth(100)
+        self.horizontalLayout.addWidget(self.dropdown2)
+
+        # Add a QLabel with = symbol
+        equal_label = QtWidgets.QLabel("=")
+        equal_label.setObjectName("equal_label")
+        self.horizontalLayout.addWidget(equal_label)
+        
+        self.add_button = QPushButton(self)
+        # self.add_button.setGeometry(QRect(580, 520, 93, 28))
+        self.add_button.setFixedHeight(30)
+        self.add_button.setFixedWidth(100)
+        self.add_button.setStyleSheet("background-color: rgb(7, 117, 127);")
+        self.add_button.setObjectName("Add")
+        self.add_button.setText( "Add ")
+        self.horizontalLayout.addWidget(self.add_button)
+
+        self.plot_layout = QtWidgets.QVBoxLayout()
+        self.plot_layout.setObjectName("plot_layout")
+        self.verticalLayout.addLayout(self.plot_layout)
 
 class MainWindow_MultiTab(QMainWindow):
     def __init__(self):
@@ -233,6 +285,9 @@ class MainWindow_MultiTab(QMainWindow):
 
         self.viewTab = MainTab()
         self.tabs.addTab(self.viewTab, "Realtime view")
+        
+        self.functionTab = functionTab()
+        self.tabs.addTab(self.functionTab, "MATH")
 
         self.settingstab = SettingTab()
         self.tabs.addTab(self.settingstab, "Settings")
