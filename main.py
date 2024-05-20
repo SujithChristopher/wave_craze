@@ -30,7 +30,6 @@ class WorkerSignals(QObject):
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
         super(Worker, self).__init__()
-
         # Store constructor arguments (re-used for processing)
         self.fn = fn
         self.args = args
@@ -64,38 +63,28 @@ class MainWindow(QMainWindow):
         self.viewTab = MainTab()
         self.mathTab = functionTab()
         self.settingsTab = SettingTab()
-        
 
         self.tabs.addTab(self.viewTab, "Realtime View")
         self.tabs.addTab(self.mathTab, "MATH")
         self.tabs.addTab(self.settingsTab, "Settings")
-
         self.threadpool = QThreadPool()
         self.x_data = np.linspace(0, 100, 100)
-        
         self.viewTab.spinBox.setMinimum(1)
         self.spin_value = 1
         self.recording_counter = 1
-        self.add_flag = 0
-
         self.parameters = self.read_config()['parameters']
         self.sampling_frequency = self.read_config()['sampling_frequency']
-        self.added_func = self.read_config()['added_func']
         self.dynamic_widgets()
         self.val = 0
         self.f_data = [np.zeros(100) for _ in range(4)]
         self.curve_dict = {}
-
         self.trigger = 0
         self.worker_thread = None
         self.stop_thread = False
-        
         self.trig = False
-        
         self.recording = False 
         self.viewTab.record_button.clicked.connect(self.toggle_record)
         self.viewTab.record_button.setStyleSheet("background-color: green")
-
         self.settingsTab.save_button.clicked.connect(self.handle_stop)
         self.viewTab.spinBox.valueChanged.connect(self.manage_widgets)
         self.viewTab.seconds_combo.activated.connect(self.select_time)
@@ -103,18 +92,14 @@ class MainWindow(QMainWindow):
         self.settingsTab.save_button.clicked.connect(self.save_data)
         self.settingsTab.tableWidget.setHorizontalHeaderLabels(["Sensor ", "Data Type"])
         self.data_saved.connect(self.update_main_tab)
-        
-
         for i, combo_box in enumerate(self.combo_boxes):
             combo_box.activated.connect(self.crv_set)
-
         self.combo_boxes[1].setVisible(False)
         self.combo_boxes[2].setVisible(False)
         self.combo_boxes[3].setVisible(False)
         self.plot_widgets[1].setVisible(False)
         self.plot_widgets[2].setVisible(False)
         self.plot_widgets[3].setVisible(False)
-
         self.select_port()
         self.update_time()
         self.load_data()
@@ -123,8 +108,6 @@ class MainWindow(QMainWindow):
         self.viewTab.stop_button.clicked.connect(self.handle_stop)
         self.mathTab.dropdown1.addItems(self.parameters.keys())
         self.mathTab.dropdown2.addItems(self.parameters.keys())
-        self.mathTab.add_button.clicked.connect(self.add_selected_sensor_values)
-
         self.browse_button = QtWidgets.QPushButton(self.settingsTab.verticalLayoutWidget)
         self.browse_button.setFixedHeight(30)
         self.browse_button.setFixedWidth(100)
@@ -132,8 +115,22 @@ class MainWindow(QMainWindow):
         self.browse_button.setStyleSheet("background-color: rgb(7, 117, 127);")
         self.browse_button.setText("Browse")
         self.browse_button.clicked.connect(self.open_file_dialog)
-        
         self.settingsTab.tableWidget.keyPressEvent = self.handle_key_press_event
+        self.mathTab.add_button.clicked.connect(self.update_math_result)
+
+    def update_math_result(self):
+        sensor1 = self.mathTab.dropdown1.currentText()
+        sensor2 = self.mathTab.dropdown2.currentText()
+        if sensor1 and sensor2:
+            index1 = list(self.parameters.keys()).index(sensor1)
+            index2 = list(self.parameters.keys()).index(sensor2)
+            if index1 < len(self.f_data) and index2 < len(self.f_data):
+                value_sensor1 = self.f_data[index1]
+                value_sensor2 = self.f_data[index2]
+                sum_data = value_sensor1 + value_sensor2
+
+                print(f"New combined sensor values: {sum_data}")
+
 
     def open_file_dialog(self):
         file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "", "TOML Files (*.toml)")
@@ -324,10 +321,7 @@ class MainWindow(QMainWindow):
     def dynamic_widgets(self):
         self.combo_boxes = []
         self.plot_widgets = []
-        
-
         y_limits = self.read_y_limits()
-        # print(y_limits) 
 
         for i in range(4):
             combo_box = QtWidgets.QComboBox()
@@ -342,14 +336,12 @@ class MainWindow(QMainWindow):
             self.viewTab.verticalLayout.addWidget(plot_widget, stretch=1)
             plot_widget.setBackground('w')
             self.plot_widgets.append(plot_widget)
-            
-            if self.add_flag == 1:
-                combo_box.addItems(self.added_func.keys())
 
             if f'y{i+1}' in y_limits:
                 plot_widget.setYRange(y_limits[f'y{i+1}'][0], y_limits[f'y{i+1}'][1])
             else:
                 print(f"Y limits not found for index {i}")
+        # print("Dynamic widgets created successfully")  
         
         for plot_widget in self.plot_widgets:
             plot_widget.scene().sigMouseClicked.connect(lambda event, plot_widget=plot_widget: self.handle_mouse_click(plot_widget, event))
@@ -370,10 +362,7 @@ class MainWindow(QMainWindow):
         if index < len(self.parameters):
             num_data_points = len(self.x_data)
             self.f_data[index] = np.zeros(num_data_points)
-
         curve.setData(self.x_data, self.f_data[index], autoDownsample=True)
-        # plot_widget.scene().sigMouseClicked.connect(lambda event: self.handle_mouse_click(plot_widget, event))
-
         plot_widget.setXRange(self.x_data[0], self.x_data[-1])
         if index in self.curve_dict:
             self.curve_dict[index].append(curve)
@@ -478,8 +467,7 @@ class MainWindow(QMainWindow):
 
     def add_rows(self):
         self.settingsTab.tableWidget.insertRow(self.settingsTab.tableWidget.rowCount())
-    
-    # displays the saved data in the settings tab
+
     def load_data(self):
         config_dir = 'C:/wave_craze'
         config_path = os.path.join(config_dir, 'config.toml')
@@ -521,7 +509,6 @@ class MainWindow(QMainWindow):
         self.settingsTab.lineEdit_8.setText(str(y_limits.get('y4', [])[1]))
         self.settingsTab.com_sf.setText(str(config.get('sampling_frequency', 1)))
 
-    #save the data form the settings tab
     def save_data(self):
         if self.settingsTab.tableWidget.rowCount() == 0 or self.settingsTab.tableWidget.columnCount() == 0:
             QMessageBox.warning(self, "Warning", "No data to save. Please add sensor parameters.")
@@ -564,8 +551,6 @@ class MainWindow(QMainWindow):
             if datatype not in ['float', 'int', 'long', 'bool', 'char']:
                 QMessageBox.warning(self, "Warning", f"Unwanted datatype '{datatype}' found for sensor '{sensor}'")
                 return
-
-        # Proceed with saving data if everything is okay
         config['parameters'] = parameters
 
         y_limits = {
@@ -577,34 +562,17 @@ class MainWindow(QMainWindow):
         config['y_limit'] = y_limits
 
         config['sampling_frequency'] = int(self.settingsTab.com_sf.text())
-
-        # Save the updated config to the 'config.toml' file
         with open(config_path, 'w') as f:
             toml.dump(config, f)
         
         with open('config.toml', 'r') as f:
             config = toml.load(f)
-        
-        # Add the new sensor to the existing TOML file
-        added_sensor_name = 'added'
-        added_sensor_type = 'float'  # Assuming the result is always a float
-        config[added_sensor_name] = added_sensor_type
-
-        # Write the updated config back to the TOML file
-        with open('config.toml', 'w') as f:
-            toml.dump(config, f)
 
         print("Data saved successfully!")
         print("Updated parameters:", parameters)
-
-        # Update the main tab with the new settings
         self.update_main_tab()
         self.update_plot_from_settings()
-
-        # Update the settings tab with the new values
         self.load_data()
-
-    #update the saved data to the widgets
     def update_main_tab(self):
         config = self.read_config()
         y_limits = config.get('y_limit', {})
@@ -621,18 +589,14 @@ class MainWindow(QMainWindow):
 
             combo_box.clear()
             combo_box.addItems(parameters.keys())
-    
-    # update the edited values form the settings tab to main tab
+
     def update_plot_from_settings(self):
-    # Read the new y-axis limits from the settings
         y_limits = {
             'y1': [float(self.settingsTab.lineEdit.text()), float(self.settingsTab.lineEdit_5.text())],
             'y2': [float(self.settingsTab.lineEdit_2.text()), float(self.settingsTab.lineEdit_6.text())],
             'y3': [float(self.settingsTab.lineEdit_3.text()), float(self.settingsTab.lineEdit_7.text())],
             'y4': [float(self.settingsTab.lineEdit_4.text()), float(self.settingsTab.lineEdit_8.text())]
         }
-
-        # Update the y-axis limits of the plot widgets
         for i, plot_widget in enumerate(self.plot_widgets):
             y_limit_key = f'y{i+1}'
             if y_limit_key in y_limits:
@@ -641,14 +605,11 @@ class MainWindow(QMainWindow):
             else:
                 print(f"Y limit key {y_limit_key} not found in y_limits")
 
-        # Read the new sampling frequency from the settings
         new_sf = int(self.settingsTab.com_sf.text())
         if new_sf != self.sampling_frequency:
             self.sampling_frequency = new_sf
             self.select_time()
-            
 
-        # Read the new sensor parameters from the settings
         parameters = {}
         for row in range(self.settingsTab.tableWidget.rowCount()):
             sensor_item = self.settingsTab.tableWidget.item(row, 0)
@@ -662,47 +623,12 @@ class MainWindow(QMainWindow):
             self.parameters = parameters
             self.load_data()
             self.crv_set()
-
+            
     def thread_complete(self):
         print("THREAD COMPLETED!")
 
     def handle_error(self, error_tuple):
         print("ERROR:", error_tuple[0])
-
-    def add_selected_sensor_values(self):
-        sensor_name1 = self.mathTab.dropdown1.currentIndex()
-        sensor_name2 = self.mathTab.dropdown2.currentIndex()
-        sensor_type1 = self.parameters.get(sensor_name1)
-        sensor_type2 = self.parameters.get(sensor_name2)
-
-        if sensor_name1 and sensor_name2 and sensor_type1 and sensor_type2:
-            index1 = list(self.parameters.keys()).index(sensor_name1)
-            index2 = list(self.parameters.keys()).index(sensor_name2)
-
-            values1 = self.f_data[index1]
-            values2 = self.f_data[index2]
-
-            added_values = [v1 + v2 for v1, v2 in zip(values1, values2)]
-
-            added_sensor_name = 'added'
-            added_sensor_type = 'float' 
-            self.added_func[added_sensor_name] = added_sensor_type
-            # self.add_flag =1
-            # # print(added_values)
-            # print(values2)
-            # self.combo_bo
-            
-
-            # # config = self.read_config()
-            # print( self.parameters)
-            # print(self.added_func)
-            
-            self.update_main_tab()
-
-            QMessageBox.information(self, "Success", "Sensor values added and saved successfully!")
-        else:
-            QMessageBox.warning(self, "Warning", "Please select two valid sensors for addition!")
-
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
