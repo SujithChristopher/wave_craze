@@ -76,9 +76,11 @@ class MainWindow(QMainWindow):
         self.viewTab.spinBox.setMinimum(1)
         self.spin_value = 1
         self.recording_counter = 1
+        self.add_flag = 0
 
         self.parameters = self.read_config()['parameters']
         self.sampling_frequency = self.read_config()['sampling_frequency']
+        self.added_func = self.read_config()['added_func']
         self.dynamic_widgets()
         self.val = 0
         self.f_data = [np.zeros(100) for _ in range(4)]
@@ -322,6 +324,7 @@ class MainWindow(QMainWindow):
     def dynamic_widgets(self):
         self.combo_boxes = []
         self.plot_widgets = []
+        
 
         y_limits = self.read_y_limits()
         # print(y_limits) 
@@ -339,12 +342,14 @@ class MainWindow(QMainWindow):
             self.viewTab.verticalLayout.addWidget(plot_widget, stretch=1)
             plot_widget.setBackground('w')
             self.plot_widgets.append(plot_widget)
+            
+            if self.add_flag == 1:
+                combo_box.addItems(self.added_func.keys())
 
             if f'y{i+1}' in y_limits:
                 plot_widget.setYRange(y_limits[f'y{i+1}'][0], y_limits[f'y{i+1}'][1])
             else:
                 print(f"Y limits not found for index {i}")
-        # print("Dynamic widgets created successfully")  
         
         for plot_widget in self.plot_widgets:
             plot_widget.scene().sigMouseClicked.connect(lambda event, plot_widget=plot_widget: self.handle_mouse_click(plot_widget, event))
@@ -663,11 +668,10 @@ class MainWindow(QMainWindow):
 
     def handle_error(self, error_tuple):
         print("ERROR:", error_tuple[0])
-        
+
     def add_selected_sensor_values(self):
-        
-        sensor_name1 = self.mathTab.dropdown1.currentText()
-        sensor_name2 = self.mathTab.dropdown2.currentText()
+        sensor_name1 = self.mathTab.dropdown1.currentIndex()
+        sensor_name2 = self.mathTab.dropdown2.currentIndex()
         sensor_type1 = self.parameters.get(sensor_name1)
         sensor_type2 = self.parameters.get(sensor_name2)
 
@@ -682,25 +686,22 @@ class MainWindow(QMainWindow):
 
             added_sensor_name = 'added'
             added_sensor_type = 'float' 
-            self.parameters[added_sensor_name] = added_sensor_type
+            self.added_func[added_sensor_name] = added_sensor_type
+            # self.add_flag =1
+            # # print(added_values)
+            # print(values2)
+            # self.combo_bo
+            
 
+            # # config = self.read_config()
+            # print( self.parameters)
+            # print(self.added_func)
+            
             self.update_main_tab()
-
-            self.update_settings_tab(added_sensor_name, added_sensor_type)
 
             QMessageBox.information(self, "Success", "Sensor values added and saved successfully!")
         else:
             QMessageBox.warning(self, "Warning", "Please select two valid sensors for addition!")
-
-    def update_settings_tab(self, sensor_name, added_sensor_type):
-        for row in range(self.settingsTab.tableWidget.rowCount()):
-            if self.settingsTab.tableWidget.item(row, 0).text() == sensor_name:
-                self.settingsTab.tableWidget.setItem(row, 1, QTableWidgetItem(added_sensor_type))
-                return
-        row_position = self.settingsTab.tableWidget.rowCount()
-        self.settingsTab.tableWidget.insertRow(row_position)
-        self.settingsTab.tableWidget.setItem(row_position, 0, QTableWidgetItem(sensor_name))
-        self.settingsTab.tableWidget.setItem(row_position, 1, QTableWidgetItem(added_sensor_type))
 
 
 if __name__ == "__main__":
