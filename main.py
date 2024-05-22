@@ -116,21 +116,7 @@ class MainWindow(QMainWindow):
         self.browse_button.setText("Browse")
         self.browse_button.clicked.connect(self.open_file_dialog)
         self.settingsTab.tableWidget.keyPressEvent = self.handle_key_press_event
-        self.mathTab.add_button.clicked.connect(self.update_math_result)
-
-    def update_math_result(self):
-        sensor1 = self.mathTab.dropdown1.currentText()
-        sensor2 = self.mathTab.dropdown2.currentText()
-        if sensor1 and sensor2:
-            index1 = list(self.parameters.keys()).index(sensor1)
-            index2 = list(self.parameters.keys()).index(sensor2)
-            if index1 < len(self.f_data) and index2 < len(self.f_data):
-                value_sensor1 = self.f_data[index1]
-                value_sensor2 = self.f_data[index2]
-                sum_data = value_sensor1 + value_sensor2
-
-                print(f"New combined sensor values: {sum_data}")
-
+        self.mathTab.add_button.clicked.connect(self.add_func)
 
     def open_file_dialog(self):
         file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "", "TOML Files (*.toml)")
@@ -198,14 +184,11 @@ class MainWindow(QMainWindow):
         if self.is_running:
             self.stop_program()
             self.is_running = False
-
-        
-
+            
     def read_config(self):
         config_dir = 'C:/wave_craze'
         os.makedirs(config_dir, exist_ok=True)  # Create 'wave_craze' folder if it doesn't exist
         config_path = os.path.join(config_dir, 'config.toml')
-
         if not os.path.exists(config_path):
             # Create a default config file if it doesn't exist
             default_config = {
@@ -257,7 +240,6 @@ class MainWindow(QMainWindow):
         ports = serial.tools.list_ports.comports()
         self.viewTab.com_port_combo.addItems([port.name for port in ports])
         self.viewTab.com_port_combo.activated.connect(self.update_serial_port)
-
     # logic for the data in seconds 
     def select_time(self):
         selected_time = int(self.viewTab.seconds_combo.currentText())
@@ -271,9 +253,7 @@ class MainWindow(QMainWindow):
                 if index < len(self.parameters):
                     self.f_data[index] = np.roll(self.f_data[index], -num_data_points)
                     self.f_data[index][:num_data_points] = 0  # Reset old data
-
         self.x_range = selected_time
-
     def update_time(self):
         self.time = [1, 5, 10]
         self.viewTab.seconds_combo.addItems([str(t) for t in self.time])
@@ -313,7 +293,6 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'csv_file') and self.csv_file:
             self.csv_file.close()  # Close the CSV file
 
-
     def change_color(self):
         self.toggle_record()
 
@@ -329,7 +308,6 @@ class MainWindow(QMainWindow):
             combo_box.addItems(self.parameters.keys())
             self.viewTab.verticalLayout.addWidget(combo_box)
             self.combo_boxes.append(combo_box)
-            # Change this line in the dynamic_widgets method
             combo_box.setCurrentIndex(-1)  # Set no current index
 
             plot_widget = pg.PlotWidget()
@@ -341,7 +319,6 @@ class MainWindow(QMainWindow):
                 plot_widget.setYRange(y_limits[f'y{i+1}'][0], y_limits[f'y{i+1}'][1])
             else:
                 print(f"Y limits not found for index {i}")
-        # print("Dynamic widgets created successfully")  
         
         for plot_widget in self.plot_widgets:
             plot_widget.scene().sigMouseClicked.connect(lambda event, plot_widget=plot_widget: self.handle_mouse_click(plot_widget, event))
@@ -412,8 +389,8 @@ class MainWindow(QMainWindow):
                     self.return_str()
                     payload_format = self.val
                     payload_size = struct.calcsize(payload_format)
-                    unpacked_data = struct.unpack(payload_format, self.payload[:payload_size])
-                    progress_callback.emit(unpacked_data)
+                    self.unpacked_data = struct.unpack(payload_format, self.payload[:payload_size])
+                    progress_callback.emit(self.unpacked_data)
                 except struct.error as e:
                     print("Error unpacking data:", e)
             if self.trigger == 1:
@@ -447,7 +424,12 @@ class MainWindow(QMainWindow):
                             if len(self.f_data[index]) % 10 == 0:
                                 for curve in self.curve_dict.get(index, []):
                                     curve.setData(self.x_data[:len(self.f_data[index])], self.f_data[index])
-
+                                    
+    def add_func(self):
+        sen1 = self.mathTab.dropdown1.currentText()
+        sen2 = self.mathTab.dropdown2.currentText()
+        added_val = (self.unpacked_data[0]) - (self.unpacked_data[1])
+        print(added_val)
     # Stop the program 
     def stop_program(self):
         self.recording = False
@@ -551,6 +533,7 @@ class MainWindow(QMainWindow):
             if datatype not in ['float', 'int', 'long', 'bool', 'char']:
                 QMessageBox.warning(self, "Warning", f"Unwanted datatype '{datatype}' found for sensor '{sensor}'")
                 return
+        # Proceed with saving data if everything is okay
         config['parameters'] = parameters
 
         y_limits = {
@@ -560,24 +543,24 @@ class MainWindow(QMainWindow):
             'y4': [float(self.settingsTab.lineEdit_4.text()), float(self.settingsTab.lineEdit_8.text())]
         }
         config['y_limit'] = y_limits
-
         config['sampling_frequency'] = int(self.settingsTab.com_sf.text())
+
+        # Save the updated config to the 'config.toml' file
         with open(config_path, 'w') as f:
             toml.dump(config, f)
-        
-        with open('config.toml', 'r') as f:
-            config = toml.load(f)
 
         print("Data saved successfully!")
         print("Updated parameters:", parameters)
+        
+        # Update the main tab with the new settings
         self.update_main_tab()
         self.update_plot_from_settings()
         self.load_data()
+        
     def update_main_tab(self):
         config = self.read_config()
         y_limits = config.get('y_limit', {})
         parameters = config.get('parameters', {})
-
         self.curve_dict = {}
 
         for i, (plot_widget, combo_box) in enumerate(zip(self.plot_widgets[:4], self.combo_boxes[:4])):
@@ -586,7 +569,6 @@ class MainWindow(QMainWindow):
                 plot_widget.setYRange(y_limits[y_limit_key][0], y_limits[y_limit_key][1])
             else:
                 print(f"Y limit key {y_limit_key} not found in y_limits")
-
             combo_box.clear()
             combo_box.addItems(parameters.keys())
 
@@ -622,14 +604,11 @@ class MainWindow(QMainWindow):
         if parameters != self.parameters:
             self.parameters = parameters
             self.load_data()
-            self.crv_set()
-            
+            self.crv_set() 
     def thread_complete(self):
         print("THREAD COMPLETED!")
-
     def handle_error(self, error_tuple):
         print("ERROR:", error_tuple[0])
-
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()

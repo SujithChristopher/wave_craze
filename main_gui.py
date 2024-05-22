@@ -246,11 +246,6 @@ class functionTab(QWidget):
         self.dropdown1.setFixedWidth(100)
         self.horizontalLayout.addWidget(self.dropdown1)
 
-        # Add a QLabel with + symbol
-        plus_label = QtWidgets.QLabel("+")
-        plus_label.setObjectName("plus_label")
-        self.horizontalLayout.addWidget(plus_label)
-
         self.dropdown2 = QtWidgets.QComboBox(self)
         self.dropdown2.setObjectName("dropdown2")
         self.dropdown2.setFixedHeight(30)
@@ -261,6 +256,12 @@ class functionTab(QWidget):
         equal_label = QtWidgets.QLabel("=")
         equal_label.setObjectName("equal_label")
         self.horizontalLayout.addWidget(equal_label)
+        
+        self.text_box = QLineEdit(self)
+        self.text_box.setObjectName("lineEdit")
+        self.text_box.setFixedHeight(30)
+        self.text_box.setFixedWidth(100)
+        self.horizontalLayout.addWidget(self.text_box)
         
         self.add_button = QPushButton(self)
         # self.add_button.setGeometry(QRect(580, 520, 93, 28))
