@@ -39,14 +39,14 @@ class mathTab(QWidget):
         equal_label = QLabel("=")
         equal_label.setObjectName("equal_label")
         self.horizontalLayout.addWidget(equal_label)
-        
+
         self.add_button = QPushButton(self)
         # self.add_button.setGeometry(QRect(580, 520, 93, 28))
         self.add_button.setFixedHeight(30)
         self.add_button.setFixedWidth(100)
         self.add_button.setStyleSheet("background-color: rgb(7, 117, 127);")
         self.add_button.setObjectName("Add")
-        self.add_button.setText( "Add ")
+        self.add_button.setText("Add ")
         self.horizontalLayout.addWidget(self.add_button)
 
         self.plot_layout = QVBoxLayout()

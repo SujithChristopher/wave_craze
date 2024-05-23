@@ -1,7 +1,5 @@
-from PySide6.QtWidgets import QWidget, QPushButton, QLabel, QLineEdit, QGridLayout, QTableWidget, QHBoxLayout, QTableWidgetItem
-from PySide6.QtCore import QRect
-from PySide6 import QtCore, QtWidgets
-
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
 
 
 class SettingTab(QWidget):
@@ -17,7 +15,7 @@ class SettingTab(QWidget):
         # self.setStyleSheet("background-color: rgb(255, 229, 167);")
         self.verticalLayoutWidget.setGeometry(QRect(10, 0, 1111, 661))
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
+        self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
 
@@ -60,14 +58,14 @@ class SettingTab(QWidget):
         self.label = QLabel(self)
         self.label.setGeometry(QRect(40, 40, 91, 41))
         self.label.setObjectName("label")
-        
+
         self.com_sf = QLineEdit(self)
         self.com_sf.setObjectName("com_sf")
         self.com_sf.setFixedHeight(20)
         self.com_sf.setFixedWidth(100)
         self.com_sf.setGeometry(QRect(400, 60, 51, 21))
-        
-        self.com_port_label = QtWidgets.QLabel(self)
+
+        self.com_port_label = QLabel(self)
         self.com_port_label.setObjectName("com_port_label")
         self.com_port_label.setText("SF :")
         # self.horizontalLayout.addWidget(self.com_port_label)
@@ -119,10 +117,10 @@ class SettingTab(QWidget):
         self.setLayout(self.verticalLayout)
 
         self.retranslateUi()
-        QtCore.QMetaObject.connectSlotsByName(self)
+        QMetaObject.connectSlotsByName(self)
 
     def retranslateUi(self):
-        _translate = QtCore.QCoreApplication.translate
+        _translate = QCoreApplication.translate
         self.setWindowTitle(_translate("MainWindow", "MainWindow"))
         self.label.setText(_translate("MainWindow", "Y- AXIS LIMITS"))
         self.add_button.setText(_translate("MainWindow", "Add "))
