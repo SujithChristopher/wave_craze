@@ -1,7 +1,6 @@
-import time
 import os
-from PyQt6.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot, QThreadPool
-from PyQt6.QtWidgets import QMainWindow, QTabWidget
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 import pyqtgraph as pg
 import sys
 import toml
@@ -10,22 +9,19 @@ import struct
 import numpy as np
 import csv
 from datetime import datetime
-from main_gui import *
 import serial.tools.list_ports
-from PyQt6.QtWidgets import QTableWidgetItem
-from PyQt6 import QtWidgets
-from PyQt6.QtWidgets import QMessageBox
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFileDialog
+from gui.mainTab import MainTab
+from gui.mathTab import mathTab
+from gui.settingsTab import SettingTab
 
 def roll(array):
     return np.roll(array, -1)
 
 class WorkerSignals(QObject):
-    finished = pyqtSignal()
-    error = pyqtSignal(tuple)
-    result = pyqtSignal(list)
-    progress = pyqtSignal(list)
+    finished = Signal()
+    error = Signal(tuple)
+    result = Signal(list)
+    progress = Signal(list)
 
 class Worker(QRunnable):
     def __init__(self, fn, *args, **kwargs):
@@ -40,7 +36,7 @@ class Worker(QRunnable):
         # Add the callback to our kwargs
         self.kwargs['progress_callback'] = self.signals.progress
 
-    @pyqtSlot()
+    @Slot()
     def run(self):
         '''
         Initialize the runner function with passed args, kwargs.
@@ -56,18 +52,18 @@ class Worker(QRunnable):
             self.signals.finished.emit()
 
 class MainWindow(QMainWindow):
-    data_saved = pyqtSignal()
+    data_saved = Signal()
     def __init__(self):
         super().__init__()
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         self.viewTab = MainTab()
-        self.mathTab = functionTab()
+        self.mathTab = mathTab()
         self.settingsTab = SettingTab()
         
 
         self.tabs.addTab(self.viewTab, "Realtime View")
-        self.tabs.addTab(self.mathTab, "MATH")
+        # self.tabs.addTab(self.mathTab, "MATH")
         self.tabs.addTab(self.settingsTab, "Settings")
 
         self.threadpool = QThreadPool()
@@ -123,7 +119,7 @@ class MainWindow(QMainWindow):
         self.mathTab.dropdown2.addItems(self.parameters.keys())
         self.mathTab.add_button.clicked.connect(self.add_selected_sensor_values)
 
-        self.browse_button = QtWidgets.QPushButton(self.settingsTab.verticalLayoutWidget)
+        self.browse_button = QPushButton(self.settingsTab.verticalLayoutWidget)
         self.browse_button.setFixedHeight(30)
         self.browse_button.setFixedWidth(100)
         self.browse_button.setGeometry(QRect(465, 520, 93, 28))
@@ -286,10 +282,10 @@ class MainWindow(QMainWindow):
                 self.serial_port = serial.Serial(selected_port, 115200)
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Error opening serial port: {e}")
-                QtWidgets.QApplication.processEvents()  # Force processing of events to show the message box
+                QApplication.processEvents()  # Force processing of events to show the message box
         else:
             QMessageBox.warning(self, "Warning", "No COM port selected")        
-            QtWidgets.QApplication.processEvents()  # Force processing of events to show the message box
+            QApplication.processEvents()  # Force processing of events to show the message box
 
     def toggle_record(self):
         if not self.recording:
@@ -327,7 +323,7 @@ class MainWindow(QMainWindow):
         # print(y_limits) 
 
         for i in range(4):
-            combo_box = QtWidgets.QComboBox()
+            combo_box = QComboBox()
             combo_box.setObjectName(f"combo_box_{i+1}")
             combo_box.addItems(self.parameters.keys())
             self.viewTab.verticalLayout.addWidget(combo_box)
@@ -426,7 +422,7 @@ class MainWindow(QMainWindow):
                 self.trigger = 2
                 break
     
-    @pyqtSlot(list)
+    @Slot(list)
     def update_plot(self, data):
         if self.recording:
             # Write data to CSV file
@@ -704,7 +700,7 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     w = MainWindow()
     w.show()
     sys.exit(app.exec())
