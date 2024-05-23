@@ -8,6 +8,7 @@ import toml
 import serial
 import struct
 import numpy as np
+import operator
 import csv
 from datetime import datetime
 from main_gui import *
@@ -73,6 +74,7 @@ class MainWindow(QMainWindow):
         self.spin_value = 1
         self.recording_counter = 1
         self.parameters = self.read_config()['parameters']
+        # self.add_val = self.read_val()['added_values']
         self.sampling_frequency = self.read_config()['sampling_frequency']
         self.dynamic_widgets()
         self.val = 0
@@ -116,7 +118,17 @@ class MainWindow(QMainWindow):
         self.browse_button.setText("Browse")
         self.browse_button.clicked.connect(self.open_file_dialog)
         self.settingsTab.tableWidget.keyPressEvent = self.handle_key_press_event
-        self.mathTab.add_button.clicked.connect(self.add_func)
+        self.mathTab.add_button.clicked.connect(self.add_sensor_values)
+        self.config = self.load_config()
+        self.add_val = self.config.get('added_values', {})
+        # Other initialization code
+
+    def load_config(self):
+        config_path = 'config.toml'
+        if os.path.exists(config_path):
+            return toml.load(config_path)
+        else:
+            return {}
 
     def open_file_dialog(self):
         file_name, _ = QFileDialog.getOpenFileName(self, "Open File", "", "TOML Files (*.toml)")
@@ -425,11 +437,37 @@ class MainWindow(QMainWindow):
                                 for curve in self.curve_dict.get(index, []):
                                     curve.setData(self.x_data[:len(self.f_data[index])], self.f_data[index])
                                     
-    def add_func(self):
-        sen1 = self.mathTab.dropdown1.currentText()
-        sen2 = self.mathTab.dropdown2.currentText()
-        added_val = (self.unpacked_data[0]) - (self.unpacked_data[1])
-        print(added_val)
+    def read_val(self):
+        return self.config.get('added_values', {})
+    def add_sensor_values(self):
+        sensor1 = self.mathTab.dropdown1.currentText()
+        sensor2 = self.mathTab.dropdown2.currentText()
+
+        if sensor1 and sensor2:
+            try:
+                values1 = self.parameters.get(sensor1, [])
+                values2 = self.parameters.get(sensor2, [])
+
+                if not values1 or not values2:
+                    raise KeyError(f"Missing sensor data for {' and '.join([sensor1, sensor2])}")
+
+                if len(values1) == len(values2) == len(self.unpacked_data):
+                    added_values = [x + y for x, y in zip(values1, values2)]
+                    new_sensor_name = f"{sensor1}_{sensor2}_added"
+
+                    self.config['sensors'][new_sensor_name] = added_values
+                    with open('config.toml', 'w') as config_file:
+                        toml.dump(self.config, config_file)
+
+                    self.combo_boxes[0].addItem(new_sensor_name)
+                    QMessageBox.information(self, 'Success', f'Sensor values added and saved as {new_sensor_name}.')
+                else:
+                    QMessageBox.critical(self, 'Error', 'Selected sensors have different lengths or do not match the unpacked data length.')
+            except KeyError as e:
+                QMessageBox.critical(self, 'Error', f'Sensor data missing: {e}')
+        else:
+            QMessageBox.critical(self, 'Error', 'Please select two sensors.')
+
     # Stop the program 
     def stop_program(self):
         self.recording = False
@@ -605,6 +643,7 @@ class MainWindow(QMainWindow):
             self.parameters = parameters
             self.load_data()
             self.crv_set() 
+            
     def thread_complete(self):
         print("THREAD COMPLETED!")
     def handle_error(self, error_tuple):

@@ -260,7 +260,7 @@ class functionTab(QWidget):
         self.text_box = QLineEdit(self)
         self.text_box.setObjectName("lineEdit")
         self.text_box.setFixedHeight(30)
-        self.text_box.setFixedWidth(100)
+        # self.text_box.setFixedWidth(100)
         self.horizontalLayout.addWidget(self.text_box)
         
         self.add_button = QPushButton(self)
