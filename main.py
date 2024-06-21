@@ -446,8 +446,8 @@ class MainWindow(QMainWindow):
 
         self.val = format_str
 
-    def unpack_values(self, progress_callback):
-        while self.serial_port.is_open:
+    def unpack_values(self):
+        if self.serial_port.is_open:
             if self.serial_read():
                 try:
                     self.return_str()
@@ -456,21 +456,19 @@ class MainWindow(QMainWindow):
                     unpacked_data = struct.unpack(
                         payload_format, self.payload[:payload_size]
                     )
-                    progress_callback.emit(unpacked_data)
+                    self.data = unpacked_data
                 except struct.error as e:
                     print("Error unpacking data:", e)
             if self.trigger == 1:
                 self.trigger = 2
-                break
 
-    @Slot(list)
-    def update_plot(self, data):
+    def update_plot(self):
         if self.recording:
             # Write data to CSV file
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S:%MS")
-            self.csv_writer.writerow([current_time] + data)
+            self.csv_writer.writerow([current_time] + self.data)
 
-        for i, value in enumerate(data):
+        for i, value in enumerate(self.data):
             for j, combo_box in enumerate(self.combo_boxes):
                 if combo_box.isVisible() and combo_box.currentIndex() == i:
                     parameter_name = combo_box.currentText()
@@ -503,11 +501,21 @@ class MainWindow(QMainWindow):
 
     # Start the program
     def start_program(self):
-        self.worker_thread = Worker(self.unpack_values)
-        self.worker_thread.signals.progress.connect(self.update_plot)
-        self.worker_thread.signals.finished.connect(self.thread_complete)
-        self.worker_thread.signals.result.connect(self.thread_complete)
-        self.threadpool.start(self.worker_thread)
+        
+        self.serial_therad = QTimer(self)
+        self.serial_therad.connect(self.unpack_values)
+        self.serial_therad.start()
+        
+        self.plotting_thread = QTimer(self)
+        self.plotting_thread.connect(self.update_plot)
+        self.plotting_thread.start()
+        
+        # self.worker_thread = Worker(self.unpack_values)
+        # self.worker_thread.signals.progress.connect(self.update_plot)
+        # self.worker_thread.signals.finished.connect(self.thread_complete)
+        # self.worker_thread.signals.result.connect(self.thread_complete)
+        # self.threadpool.start(self.worker_thread)
+        
         self.viewTab.start_button.setEnabled(False)
         self.viewTab.stop_button.setEnabled(True)
 
